@@ -1,0 +1,12 @@
+# Output & build
+.nuxt
+.output
+.cache
+dist
+
+# Dependencies
+node_modules
+
+# Env & misc
+.env
+.DS_Store
