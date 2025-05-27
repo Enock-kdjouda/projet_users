@@ -50,5 +50,9 @@ public function logout(Request $req)
     $req->user()->currentAccessToken()->delete();
     return response()->json(['message'=>'Déconnecté']);
 }
+public function me(Request $request)
+{
+    return response()->json($request->user());
+}
 
 }

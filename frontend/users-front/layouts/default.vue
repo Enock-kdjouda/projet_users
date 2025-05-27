@@ -28,6 +28,7 @@ const auth = useAuthStore()
 onMounted(() => {
   auth.init()
 })
+
 </script>
 
 <style scoped>

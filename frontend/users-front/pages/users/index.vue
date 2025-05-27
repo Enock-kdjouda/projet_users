@@ -2,13 +2,15 @@
   <div class="p-6">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Liste des utilisateurs</h1>
-      <NuxtLink to="/users/create" class="btn-primary">Créer un utilisateur</NuxtLink>
-        <button @click="exportToExcel"
-            class="mb-0 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-            Exporter en Excel
+
+      <!-- Boutons visibles uniquement par les admins -->
+      <div v-if="userRole === 'admin'" class="flex gap-2">
+        <NuxtLink to="/users/create" class="btn-primary">Créer un utilisateur</NuxtLink>
+        <button @click="exportToExcel" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Exporter en Excel
         </button>
+      </div>
     </div>
-   
 
     <input
       v-model="search"
@@ -35,8 +37,12 @@
           <td class="p-2 border">{{ user.role }}</td>
           <td class="p-2 border space-x-2">
             <NuxtLink :to="`/users/${user.id}`" class="btn-secondary">Voir</NuxtLink>
-            <NuxtLink :to="`/users/edit?id=${user.id}`" class="btn-warning">Modifier</NuxtLink>
-            <button @click="deleteUser(user.id)" class="btn-danger">Supprimer</button>
+
+            <!-- Boutons visibles uniquement par l’admin -->
+            <template v-if="userRole === 'admin'">
+              <NuxtLink :to="`/users/edit?id=${user.id}`" class="btn-warning">Modifier</NuxtLink>
+              <button @click="deleteUser(user.id)" class="btn-danger">Supprimer</button>
+            </template>
           </td>
         </tr>
       </tbody>
@@ -44,43 +50,49 @@
 
     <!-- Pagination -->
     <div class="mt-4 flex justify-center space-x-2">
-      <button
-        v-if="meta.current_page > 1"
-        @click="page--"
-        class="btn-secondary"
-      >
-        Précédent
-      </button>
+      <button v-if="meta.current_page > 1" @click="page--" class="btn-secondary">Précédent</button>
       <span class="px-3 py-1">{{ meta.current_page }} / {{ meta.last_page }}</span>
-      <button
-        v-if="meta.current_page < meta.last_page"
-        @click="page++"
-        class="btn-secondary"
-      >
-        Suivant
-      </button>
+      <button v-if="meta.current_page < meta.last_page" @click="page++" class="btn-secondary">Suivant</button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import * as XLSX from 'xlsx' // Importation de SheetJS
+import * as XLSX from 'xlsx'
 
 const users = ref([])
 const token = ref('')
 const page = ref(1)
 const meta = ref({ current_page: 1, last_page: 1 })
 const search = ref('')
+const userRole = ref('') // pour stocker le rôle
 
-onMounted(() => {
+onMounted(async () => {
   if (process.client) {
     token.value = localStorage.getItem('token') || ''
-    fetchUsers()
+    await getUserRole() // Charger le rôle d'abord
+    await fetchUsers()
   }
 })
 
 watch([page, search], fetchUsers)
+
+async function getUserRole() {
+  if (!token.value) return
+
+  try {
+    const response = await $fetch('http://localhost:8000/api/user', {
+      headers: {
+        Authorization: `Bearer ${token.value}`
+      }
+    })
+
+    userRole.value = response.role
+  } catch (error) {
+    console.error("Erreur lors de la récupération du rôle:", error)
+  }
+}
 
 async function fetchUsers() {
   if (!token.value) return
@@ -106,17 +118,20 @@ async function deleteUser(id) {
   if (!token.value) return
 
   if (confirm('Confirmer la suppression ?')) {
-    await $fetch(`http://localhost:8000/api/users/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token.value}`
-      }
-    })
-    fetchUsers()
+    try {
+      await $fetch(`http://localhost:8000/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token.value}`
+        }
+      })
+      fetchUsers()
+    } catch (err) {
+      console.error("Erreur suppression:", err)
+    }
   }
 }
 
-//  Fonction pour exporter en Excel
 async function exportToExcel() {
   const allUsers = await fetchAllUsersForExport()
 
@@ -128,10 +143,9 @@ async function exportToExcel() {
   const worksheet = XLSX.utils.json_to_sheet(allUsers)
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Utilisateurs')
-// Créez un fichier Excel et téléchargez-le
   XLSX.writeFile(workbook, 'liste_utilisateurs.xlsx')
 }
-//  Fonction pour récupérer tous les utilisateurs pour l'exportation
+
 async function fetchAllUsersForExport() {
   if (!token.value) return []
 
@@ -158,9 +172,7 @@ async function fetchAllUsersForExport() {
 
   return allUsers
 }
-
 </script>
-
 
 <style scoped>
 .btn-primary {
