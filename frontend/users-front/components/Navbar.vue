@@ -13,12 +13,15 @@
 
 <script setup>
 import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
 
 const auth = useAuthStore()
-const user = auth.user
-console.log('USER DANS L\'EN-TÊTE :', user)
+
+// 🧠 Liaison réactive à l'état de l'utilisateur
+const user = computed(() => auth.user)
 
 const logout = async () => {
   await auth.logout()
 }
 </script>
+
